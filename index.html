@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, user-scalable=no" />
+    <meta name="description" content="Vanilla JS demo" />
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <h2>Extract ID Info & Liveness detection</h2>
+    <div id="container"></div>
+
+    <div style="margin-bottom:10px">
+      <label>
+        Access key
+        <input id="access-key" style="width:500px" />
+      </label>
+    </div>
+    <div style="margin-bottom:10px">
+      <label>
+        Secret key
+        <input id="secret-key" style="width:500px" />
+      </label>
+    </div>
+    <div style="margin-bottom:10px">
+      <label>
+        API URL
+        <input id="api-url" style="width:500px" />
+      </label>
+    </div>
+    <div>
+      Api check:
+      <select id="select-api-check">
+        <option value="false">false</option>
+        <option value="true">true</option>
+      </select>
+    </div>
+    <hr />
+    <h4>Extract ID Info</h4>
+    <button onclick="startExtractIDInfo()">Start Extract ID Info</button>
+    <div id="result-extract-id-info"></div>
+    <hr />
+    <h4>Liveness detection</h4>
+    <div style="margin-bottom:10px">
+      Mode:
+      <select id="select-mode"></select>
+    </div>
+    <button onclick="startLivenessDetection()">Liveness detection</button>
+    <div id="result-liveness-detection"></div>
+    <script src="/msb-build/tvweb-sdk.msb.standalone.min.js"></script>
+    <script type="text/javascript">
+      const tv = new TVWebSDK.SDK({
+        container: document.getElementById("container"),
+        lang: "vi",
+      });
+      window.tv = tv;
+      const resultExtractIdInfoEl = document.getElementById(
+        "result-extract-id-info"
+      );
+      const resultLivenessDetectionEl = document.getElementById(
+        "result-liveness-detection"
+      );
+      const selectModeEl = document.getElementById("select-mode");
+      const selectApiCheckEl = document.getElementById("select-api-check");
+      const selectEnableRecordingEl = document.getElementById("select-enable-recording");
+      const inputAccessKey = document.getElementById("access-key");
+      const inputSecretKey = document.getElementById("secret-key");
+      const inputApiUrl = document.getElementById("api-url");
+      inputAccessKey.value = "5767c20d-87aa-4cad-8dbb-f5429f76c34b"
+      inputSecretKey.value = "c1446919-e60a-4575-a05d-304318212a1b"
+      inputApiUrl.value = "https://tv-testing.trustingsocial.com/api"
+      
+      Object.keys(TVWebSDK.Constants.Mode).forEach((k) => {
+        const option = document.createElement("option");
+        option.appendChild(document.createTextNode(k));
+        option.setAttribute("value", TVWebSDK.Constants.Mode[k]);
+        selectModeEl.appendChild(option);
+      });
+
+      Object.keys(TVWebSDK.Constants.IDCardSide).forEach((k) => {
+        const option = document.createElement("option");
+        option.appendChild(document.createTextNode(k));
+        option.setAttribute("value", TVWebSDK.Constants.IDCardSide[k]);
+      });
+
+      function startExtractIDInfo() {
+        const apiCheck = selectApiCheckEl.value === "true";
+
+        tv.openCamera({
+          frontCamera: false,
+          title: "Mặt trước CMND/CCCD",
+          titleIcon: "id_card_front.svg",
+          description: "Căn mặt trước CMND/CCCD vào khung",
+          onImageTaken: handleImageTaken,
+        });
+      }
+
+      function startLivenessDetection() {
+        const livenessDetectionMode = selectModeEl.value;
+        const apiCheck = selectApiCheckEl.value === "true";
+        resultLivenessDetectionEl.innerHTML = "";
+        tv.livenessDetection({
+          apiCheck: apiCheck,
+          mode: livenessDetectionMode,
+          accessKey: inputAccessKey.value,
+          secretKey: inputSecretKey.value,
+          apiUrl: inputApiUrl.value,
+          captureFrameData: true,
+          onLivenessDetectionDone: handleLivenessDetectionDone,
+          onError: (e) => console.error(e),
+        });
+      }
+
+      function handleImageTaken(img) {
+        const imgEl = document.createElement("img");
+        imgEl.width = "200";
+        imgEl.src = URL.createObjectURL(img);
+        resultExtractIdInfoEl.appendChild(imgEl);
+        
+        tv.destroyView();
+      }
+
+      function handleLivenessDetectionDone(result) {
+        const { frontalFaces, apiCheckPassed, steps, videoRecord, captureFrames } = result;
+        const apiCheck = selectApiCheckEl.value === "true";
+
+        if (apiCheck === false) {
+          setTimeout(function () {
+            tv.destroyView();
+            resultLivenessDetectionEl.appendChild(
+              document.createTextNode("Random frontal faces detected: ")
+            );
+            frontalFaces.forEach((blob) => {
+              const imgEl = document.createElement("img");
+              imgEl.width = "200";
+              imgEl.style.marginRight = "5px";
+              imgEl.src = URL.createObjectURL(blob);
+              resultLivenessDetectionEl.appendChild(imgEl);
+            });
+            resultLivenessDetectionEl.appendChild(document.createElement("br"));
+            resultLivenessDetectionEl.appendChild(document.createElement("br"));
+            resultLivenessDetectionEl.appendChild(
+              document.createTextNode("Directional faces:")
+            );
+            steps.forEach((s) => {
+              const imgEl = document.createElement("img");
+              imgEl.width = "200";
+              imgEl.style.marginRight = "5px";
+              imgEl.src = URL.createObjectURL(s.image.blob);
+              resultLivenessDetectionEl.appendChild(imgEl);
+            });
+            resultLivenessDetectionEl.appendChild(document.createElement("br"));
+            resultLivenessDetectionEl.appendChild(document.createElement("br"));
+            resultLivenessDetectionEl.appendChild(
+              document.createTextNode("Video:")
+            );
+            if (videoRecord.length) {
+              const videoEl = document.createElement("video");
+              videoEl.width = "200";
+              videoEl.controls = "controls";
+              videoEl.src = URL.createObjectURL(videoRecord[0]);
+              resultLivenessDetectionEl.appendChild(videoEl);
+            }
+          }, 500);
+        } else {
+          tv.destroyView();
+          resultLivenessDetectionEl.appendChild(
+            document.createTextNode(`apiCheckPassed: ${apiCheckPassed}`)
+          );
+        }
+      }
+    </script>
+  </body>
+</html>
